@@ -1,0 +1,376 @@
+---
+title: "Finding the Best Markets to Advertise In Guided Project"
+author: "Joshua Pasaye"
+date: "2023-08-19"
+output: html_document
+---
+
+# Understanding the Data
+
+To reach our goal, we could organize surveys for a couple of different markets to find out which would the best choices for advertising. This is very costly, however, and it's a good call to explore cheaper options first.
+
+We can try to search existing data that might be relevant for our purpose. One good candidate is the data from freeCodeCamp's New Coder Survey. freeCodeCamp is a free e-learning platform that offers courses on web development. Because they run a popular Medium publication (over 400,000 followers), their survey attracted new coders with varying interests (not only web development), which is ideal for the purpose of our analysis.
+
+The 2017 survey data is publicly available in this GitHub repository. We'll use the 2017 dataset for our examples and for the solution notebook.
+
+```{r}
+setwd("C:\\Users\\joshp\\OneDrive\\Desktop\\Data Quest")
+library(readr)
+fcc <- read_csv("2017-fCC-New-Coders-Survey-Data.csv")
+dim(fcc)
+head(fcc, 5)
+```
+
+# Checking for Sample Representativity
+
+As we mentioned earlier, most of the courses we offer are on web and mobile development, but we also cover many other domains, like data science, game development, etc. For the purpose of our analysis, we want to answer questions about a population of new coders that are interested in the subjects we teach. We'd like to know:
+
+  -Where are these new coders located.
+  -What are the locations with the greatest number of new coders.
+  -How much money new coders are willing to spend on learning.
+
+Before starting to analyze the sample data we have, we need to clarify whether it's representative for our population of interest and it has the right categories of people for our purpose.
+
+```{r}
+library(dplyr)
+# split and combine workflow
+fcc %>%
+  group_by(JobRoleInterest) %>%
+  summarise(freq = n()* 100 / nrow(fcc)) %>%
+  arrange(desc(freq))
+```
+
+```{r}
+#Drop NA values in JobRoleInterest
+split_interest <- fcc %>%
+  select(JobRoleInterest) %>%
+  tidyr::drop_na() %>%
+  rowwise() %>%
+  mutate(opts = length(stringr::str_split(JobRoleInterest, ",")[[1]]))
+```
+
+```{r}
+# Frequency table for options
+options <- split_interest %>%
+  ungroup() %>%
+  group_by(opts) %>%
+  summarise(freq = n() * 100/ nrow(split_interest))
+print(options)
+```
+
+The focus of our courses is on web and mobile development, so let's find out how many respondents chose at least one of these two options.
+
+```{r}
+# Split-and-combine
+library(dplyr)
+web_or_mobile <- stringr::str_detect(fcc$JobRoleInterest, "Web Developer|Mobile Developer")
+freq_table <- table(web_or_mobile)
+freq_table <- freq_table * 100 / sum(freq_table)
+freq_table
+```
+
+```{r}
+# Graph
+df <- tibble::tibble(x = c("Other Subject", "Web or Mobile Development"),
+                     y = freq_table)
+
+library(ggplot2)
+ggplot(data = df, aes(x = x, y = y, fill = x)) +
+  geom_histogram(stat = "identity") +
+  labs(x = "Job Interest",
+       y = "Frequency",
+       title = "Frequency of Web or Mobile Development vs Other Subjects") 
+```
+
+# New Coders - Locations and Densities
+
+Now that we found out that the sample has the right categories of people for our purpose, we can begin analyzing it. We can start with finding out where these new coders are located, and what are the densities (how many coders there are) for each location.
+
+The data set provides information about the location of each participant at a country level. The CountryCitizen variable describes the country of origin for each participant, and the CountryLive variable describes what country each participants lives in (which may be different than the origin country).
+
+For our analysis, we'll work with the CountryLive variable because we're interested where people actually live at the moment when we run the ads. In other words, we're interested where people are located, not where they were born.
+
+Because the data set provides information at a country level, we can think of each country as an individual market. This means we can frame our goal as finding the two best countries to advertise in.
+
+One indicator of a good market is the number of potential customers — the more potential customers in a market, the better. If our ads manage to convince 10% of the 5,000 potential customers in market A to buy our product, then this is better than convincing 100% of the 30 potential customers in market B.
+
+```{r}
+# Isolate participants we're interested in
+fcc_good <- fcc %>%
+  tidyr::drop_na(JobRoleInterest)
+
+# Frequency with absolute and relative frequencies
+fcc_good %>%
+  group_by(CountryLive) %>%
+  summarise(`Absolute Frequency` = n(),
+            `Percentage` = n() * 100 / nrow(fcc_good)) %>%
+  arrange(desc(Percentage))
+```
+
+44.69% of our potential customers are located in the US, and this definitely seems like the most interesting market. India has the second customer density, but it's just 7.55%, which is not too far from the United Kingdom (4.50%) or Canada (3.71%).
+
+# Spending Money for Learning
+
+Previously, we found useful information about the location of new coders, and what are the countries where new coders live, but we need to go more in depth with our analysis before taking a decision. We can continue by figuring out how much money new coders are actually willing to spend on learning. Advertising within markets where most people are only willing to learn for free is extremely unlikely to be profitable for us.
+
+The MoneyForLearning column describes in American dollars the amount of money spent by participants from the moment they started coding until the moment they completed the survey. Our company sells subscriptions at a price of $59 per month, and for this reason we're interested in finding out how much money each student spends per month.
+
+It also seems like a good idea to narrow down our analysis to only four countries: the US, India, the United Kingdom, and Canada. Two reasons for this decision are:
+
+  -These are the countries having the highest absolute frequencies in our sample, which means we have a decent amount of data for each.
+  -Our courses are written in English, and English is an official language in all these four countries. The more people that know English, the better our chances to target the right people with our ads.
+
+```{r}
+# Replacing 0s with 1s
+fcc_good <- fcc_good %>%
+  mutate(MonthsProgramming = replace(MonthsProgramming,  MonthsProgramming == 0, 1) )
+
+# New column for the amount of money each student spends each month
+fcc_good <- fcc_good %>%
+  mutate(money_per_month = MoneyForLearning/MonthsProgramming) 
+
+fcc_good %>%
+  summarise(na_count = sum(is.na(money_per_month)) ) %>%
+  pull(na_count)
+
+# Drop NA values from money_per_money
+fcc_good <- fcc_good %>%
+  tidyr::drop_na(money_per_month)
+```
+
+We want to group the data by country, and then measure the average amount of money that students spend per month in each country. First, let's remove the rows having `NA` values for the `CountryLive` column, and check out if we still have enough data for the four countries that interest us.
+
+```{r}
+# Remove NA from `CountryLive`
+fcc_good <- fcc_good %>%
+  tidyr::drop_na(CountryLive)
+
+# Frequency table
+fcc_good %>%
+  group_by(CountryLive) %>%
+  summarise(freq = n() ) %>%
+  arrange(desc(freq)) %>%
+  head()
+
+# Mean sum of money spent by students each month
+countries_mean <- fcc_good %>%
+  filter(CountryLive == 'United States of America' | CountryLive == 'India' | CountryLive == 'United Kingdom' | CountryLive == 'Canada') %>%
+  group_by(CountryLive) %>%
+  summarise(mean = mean(money_per_month)) %>%
+  arrange(desc(mean))
+
+countries_mean
+```
+
+The results for the United Kingdom and Canada are surprisingly low relative to the values we see for India. If we considered a few socio-economical metrics (like GDP per capita), we'd intuitively expect people in the UK and Canada to spend more on learning than people in India.
+
+It might be that we don't have have enough representative data for the United Kingdom, Canada, and India, or we have some outliers (maybe coming from wrong survey answers) making the mean too big for India, or too low for the UK and Canada. Or it might be that the results are correct.
+
+# Dealing with Extreme Outliers
+
+In the last exercise, you should have arrived at the following mean values:
+
+```{r}
+# A tibble: 4 x 2
+#  CountryLive               mean
+#  <chr>                    <dbl>
+# 1 United States of America 228. 
+# 2 India                    135. 
+# 3 Canada                   114. 
+# 4 United Kingdom            45.5
+```
+
+The results for the United Kingdom and Canada are surprisingly low relative to the values we see for India. If we considered a few socio-economical metrics (like GDP per capita), we'd intuitively expect people in the UK and Canada to spend more on learning than people in India.
+
+It might be that we don't have have enough representative data for the United Kingdom, Canada, and India, or we have some outliers (maybe coming from wrong survey answers) making the mean too big for India, or too low for the UK and Canada. Or it might be that the results are correct.
+
+```{r}
+# Isolating counties of interest
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+countries_4 <- fcc_good %>% 
+  filter(CountryLive == 'United States of America' | CountryLive == 'India' | CountryLive == 'United Kingdom'|CountryLive == 'Canada')
+
+# Match number of rows  to original database
+countries_4 <- countries_4 %>%
+  mutate(index = row_number())
+
+# Boxplot to visualize distribution
+ggplot(data = countries_4, 
+       aes(x = CountryLive, y = money_per_month)) +
+  geom_boxplot() + 
+  ggtitle("Money Spent Per Month Per Country\n(Distributions)") +
+  xlab("Country") +
+  ylab("Money per month (US dollars)") +
+  theme_bw()
+
+# Isolate below 10000 per month
+fcc_good <- fcc_good %>%
+  filter(money_per_month < 20000)
+
+# Mean sum of money spent by students each month
+countries_mean = fcc_good %>%
+  filter(CountryLive == "United States of America" | CountryLive == "India" | CountryLive == "United Kingdom"|CountryLive == "Canada") %>%
+  group_by(CountryLive) %>%
+  summarise(mean = mean(money_per_month)) %>%
+  arrange(desc(mean))
+
+countries_mean
+
+# Isolate only the countries of interest
+countries_4 <- fcc_good %>% 
+  filter(CountryLive == 'United States of America' | CountryLive == 'India' | CountryLive == 'United Kingdom'|CountryLive == 'Canada') %>%
+  mutate(index = row_number())
+
+# Boxplot of new distribution
+ggplot(data = countries_4, aes(x = CountryLive, y = money_per_month)) +
+  geom_boxplot() +
+  ggtitle("Money Spent Per Month Per Country\n(Distributions)") +
+  xlab("Country") +
+  ylab("Money per month (US dollars)") +
+  theme_bw()
+```
+
+We can see a few extreme outliers for India (values over \$2,500 per month), but it's unclear whether this is good data or not.
+
+```{r}
+# Inspect the extreme outliers for India
+india_outliers <- countries_4 %>%
+  filter(CountryLive == "India" &
+           money_per_month >= 2500)
+india_outliers
+
+# Remove india outliers
+countries_4 <- countries_4 %>%
+  filter(!(index %in% india_outliers$index))
+
+# Examine the extreme outliers for the US
+us_outliers <- countries_4 %>%
+  filter(CountryLive == "United States of America" &
+           money_per_month >= 6000)
+us_outliers
+
+# Remove US outliers
+countries_4 <- countries_4 %>%
+  filter(!(index %in% us_outliers$index))
+```
+
+In the next code block, we'll remove respondents that:
+
+- Didn't attend bootcamps.
+- Had been programming for three months or less when at the time they completed the survey.
+
+```{r}
+# Remove the respondents who didn't attendent a bootcamp
+no_bootcamp <- countries_4 %>%
+  filter(CountryLive == "United States of America" &
+           money_per_month >= 6000 &
+           AttendedBootcamp  == 0)
+
+countries_4 <- countries_4 %>%
+  filter(!(index %in% no_bootcamp$index))
+
+# Remove the respondents that had been programming for less than 3 months
+less_than_3_months <- countries_4 %>%
+  filter(CountryLive == "United States of America" &
+           money_per_month >= 6000 &
+           MonthsProgramming <= 3)
+
+countries_4 <- countries_4 %>%
+  filter(!(index %in% less_than_3_months$index))
+```
+
+Looking again at the last box plot above, we can also see an extreme outlier for Canada — a person who spends roughly \$5,000 per month
+
+```{r}
+# Canada outliers
+canada_outliers <- countries_4 %>%
+  filter(CountryLive == "Canada" &
+           money_per_month >= 4500 &
+           MonthsProgramming <= 3)
+canada_outliers
+
+# Remove canada outliers
+countries_4 <- countries_4 %>%
+  filter(!(index %in% canada_outliers$index))
+```
+
+Recompute the mean values and generate the final box plots.
+
+```{r}
+# Mean sum of money spent by students each month
+countries_mean = countries_4 %>%
+  group_by(CountryLive) %>%
+  summarise(mean = mean(money_per_month)) %>%
+  arrange(desc(mean))
+
+countries_mean
+
+# Boxplot of distribution
+ggplot( data = countries_4, aes(x = CountryLive, y = money_per_month)) +
+  geom_boxplot() +
+  ggtitle("Money Spent Per Month Per Country\n(Distributions)") +
+  xlab("Country") +
+  ylab("Money per month (US dollars)") +
+  theme_bw()
+```
+
+# Choosing the Two Best Markets
+
+After eliminating the extreme outliers, we found the following mean values:
+
+```{r}
+# A tibble: 4 x 2
+#  CountryLive               mean
+#  <chr>                    <dbl>
+# 1 United States of America 142. 
+# 2 India                    65. 
+# 3 Canada                   93. 
+# 4 United Kingdom           45.5
+```
+
+
+
+There's not only one solution in this case, and you might have found solid arguments to take different decisions with respect to eliminating some of the outliers. You can see the decision we took in the solution notebook.
+
+Considering the results we've found so far, one country we should definitely advertise in is the US. There are a lot of new coders living there and they are willing to pay a good amount of money each month.
+
+We need to choose one more market though.
+
+The data suggests strongly that we shouldn't advertise in the UK, but let's take a second look at India before deciding to choose Canada as our second best choice:
+
+- $59 doesn't seem like an expensive sum for people in India since they spend on average \$66 each month.
+- We have almost twice as more potential customers in India than we have in Canada:
+
+```{r}
+# Frequency table for CountryLive column
+countries_4 %>% group_by(CountryLive) %>%
+  summarise(freq = n() * 100 / nrow(countries_4)) %>%
+  arrange(desc(freq)) %>%
+  head()
+
+# Frequency table to check if we still have enough data
+countries_4 %>% group_by(CountryLive) %>%
+  summarise(freq = n()) %>%
+  arrange(desc(freq)) %>%
+  head()
+```
+
+At this point, it seems that we have several options:
+
+1. Advertise in the US, India, and Canada by splitting the advertisement budget in various combinations:
+    - 60% for the US, 25% for India, 15% for Canada.
+    - 50% for the US, 30% for India, 20% for Canada; etc.
+
+2. Advertise only in the US and India, or the US and Canada. Again, it makes sense to split the advertisement budget unequally. For instance:
+    - 70% for the US, and 30% for India.
+    - 65% for the US, and 35% for Canada; etc.
+
+3. Advertise only in the US.
+
+In this project, we analyzed survey data from new coders to find the best two markets to advertise in. The only solid conclusion we reached is that the US would be a good market to advertise in.
+
+For the second best market, it wasn't clear-cut what to choose between India and Canada. We decided to send the results to the marketing team so they can use their domain knowledge to take the best decision.
+
+# END

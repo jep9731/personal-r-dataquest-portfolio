@@ -1,0 +1,311 @@
+---
+title: "Winning Jeopardy Guided Project"
+author: "Joshua Pasaye"
+date: "2023-08-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Getting To Know Jeopardy Data
+
+Jeopardy is a popular TV show in the US where participants answer trivia to win money. Participants are given a set of categories to choose from and a set of questions that increase in difficulty. As the questions get more difficult, the participant can earn more money for answering correctly.
+
+In June 2019, contestant James Holzhauer ended a 32-game winning streak, just barely missing the record for highest winnings. James Holzhauer dedicated hours of effort to optimizing what he did during a game to maximize how much money he earned. To achieve what he did, James had to learn and master the vast amount of trivia that Jeopardy can throw at the contestants.
+
+Let's say you want to compete on Jeopardy like James. As he did, you'll have to familiarize yourself with an enormous amount of trivia to be competitive. Given the vastness of the task, is there a way that we can somehow simplify our studies and prioritize topics that appear more often in Jeopardy? In this project, you'll work with a dataset of Jeopardy questions to figure out some patterns in the questions that could help you win.
+
+Each row represents a single question from a single episode of Jeopardy. Crucially, we can see the different question categories that appeared on a particular episode, the questions and answers themselves, and the value associated with the question.
+
+### Instructions
+
+1. Read the dataset into a tibble called jeopardy using tidyverse.
+2. Print out the first 5 rows of jeopardy
+3. Print out the columns of the jeopardy data
+4. Perform some formatting on the column names for easier analysis later:
+    - Replace the spaces with underscores for each column and
+    - lowercase all of the column names
+    - You can do all this by assigning colnames(jeopardy) to a new character vector
+5. Make sure that you understand what type is column is before proceeding
+
+```{r data_1}
+# Load libraries
+library(readr)
+library(tidyverse)
+library(ggplot2)
+
+# Load data
+jeopardy <- read.csv("jeopardy.csv")
+
+# Print first 5 rows of jeopardy data
+head(jeopardy, 5)
+
+# Print out columns of jeopardy data
+colnames(jeopardy)
+
+# Clean column names
+colnames(jeopardy) = c("show_number", "air_date", "round", "category", "value", "question", "answer")
+
+# what type is column is
+sapply(jeopardy, typeof)
+```
+
+## Fixing Data Types
+
+One of the curious things you may have seen is that the value column has the character type! We would expect this to have a numerical value, so let's have a look at the value column to see why this might be the case:
+
+```{r ex, echo=FALSE}
+unique(jeopardy$value)
+```
+
+It turns out that the value column actually incorporates a dollar sign and uses the value None in places where the question came from a Final Jeopardy, the last question of every episode. The presence of these factors causes R to convert this column to a character instead of a numerical one. For our later analysis, we'll need the value column to be numeric, so we should do this now. 
+
+### Instructions
+
+1. Filter jeopardy so that we remove all of the "None" values from the dataset. We will be sacrificing some questions, but this will make analysis easier later.
+2. Use regular expression to remove all of the dollar signs and commas that appear in the value column.
+    - You can use the str_replace_all() multiple times to remove these troublesome values
+3. Finally, convert the cleaned value column into a numeric column and make sure that you've done the conversion correctly.
+
+```{r data_2}
+# Removing "None", $ sign and comma, and making it a numeric
+jeopardy = jeopardy %>% 
+  filter(value != "None") %>% 
+  mutate(
+    value = str_replace_all(value, "[$,]", ""),
+    value = as.numeric(value)
+  )
+
+# Checking
+unique(jeopardy$value)
+```
+
+## Normalizing Text
+
+One messy aspect about the Jeopardy dataset is that it contains text. Text can contain punctuation and different capitalization, which will make it hard for us to compare the text of an answer to the text of a question. We would like to make this process easier for ourselves, so we'll need to process the text data in this step. The process of cleaning text in data analysis is sometimes called normalization. More specifically, we want ensure that we lowercase all of the words and any remove punctuation. We remove punctuation because it ensures that the text stays as purely letters. Before normalization, the terms Don't and don't are considered to be different words, and we don't want this. For this step, normalize the question, answer, and category columns.
+
+### Instructions
+
+1. Take the question, answer and category columns and normalize them.
+    - Lowercase all of the words of every question and answer
+    - Remove all punctuation. A good way of thinking about this is establishing everything we want to keep and negating this to remove everything we don't want. In this case, we want to keep all letters and numbers.
+    - str_replace_all() is your best friend here too
+2. As always, check your work to make sure that your data cleaning had its intended effect
+
+```{r data_3}
+# Normalization
+jeopardy = jeopardy %>% 
+  mutate(
+    question = tolower(question),
+    question = str_replace_all(question, "[^A-Za-z0-9 ]", ""),
+    answer = tolower(answer),
+    answer = str_replace_all(answer, "[^A-Za-z0-9 ]", ""),
+    category = tolower(category),
+    category = str_replace_all(category, "[^A-Za-z0-9 ]", "")
+  )
+
+# Check to determine if it worked
+head(jeopardy)
+```
+
+## Making Dates More Accessible
+
+In our last data cleaning step, we need to address the air_date column. Like value's original type, air_date is a character. Ideally we would want to separate this column into a year, month and day column to make filtering easier in the future. Furthermore, we would also want each of these new date columns to be numeric to make comparison easier as well.
+
+### Instructions
+
+1. Take the air_date column and split it into 3 new columns: year, month and day.
+    - the separate() function can serve you well here
+2. Convert each of these new columns into numeric columns as well.
+
+```{r data_4}
+# Split air_date into 3 columns and convert into numeric columns
+jeopardy = jeopardy %>% 
+  separate(., air_date, into = c("year", "month", "day"), sep = "-") %>% 
+  mutate(
+    year = as.numeric(year),
+    month = as.numeric(month),
+    day = as.numeric(day)
+  )
+```
+
+## Focusing On Particular Subject Areas
+
+We are now in a place where we can properly ask questions from the data and perform meaningful hypothesis tests on it. Given the near infinite amount of questions that can be asked in Jeopardy, you wonder if any particular subject area has increased relevance in the dataset. Many people seem to think that science and history facts are the most common categories to appear in Jeopardy episodes. Others feel that Shakespeare questions gets an awful lot of attention from Jeopardy.
+
+With the chi-squared test, we can actually test these hypotheses! For this exercise, let's assess if science, history and Shakespeare have a higher prevalence in the data set. First, we need to develop our null hypotheses. There are around 3369 unique categories in the Jeopardy data set after doing all of our cleaning. If we suppose that no category stood out, we would expect that the probability of picking a random category would be the same no matter what category you picked. This comes out to be 1/3369. This would also mean that the probability of not picking a particular category would be 3368/3369. When we first learned the chisq.test() function when testing for the number of males and females in the Census data, we assumed that their proportion would be equal — that there would be a 50-50 split between them. The chisq.test() automatically assumes this of the data you provide it, but we can also specify what these proportions should be using the p argument.
+
+```{r #example}
+n_questions <- nrow(jeopardy)
+p_category_expected <-   1/3369 
+p_not_category_expected <- 3368/3369 
+p_expected <- c(p_category_expected, p_not_category_expected)
+```
+
+### Instructions
+
+For each of the three categories we discussed (science, history, Shakespeare), conduct a hypothesis test to see if they are more likely to appear than other categories. The process can be broken down below:
+
+1. For Science:
+    - First, count how many times the word "science" appears in the category column. Use this information to count how many times "science" doesn't appear in the category.
+    - After counting these values, the chisq.test() to conduct the hypothesis test.
+    - After investigating the resulting test, make your conclusion about the null hypothesis. Write your conclusions below the tests you conduct. 
+2. Repeat the above for History and Shakespeare
+
+```{r data_5_1}
+n_questions = nrow(jeopardy)
+p_category_expected = 1/3369 
+p_not_category_expected = 3368/3369
+
+# Count science rows and perform chi sqaured test
+categories = pull(jeopardy, category)
+n_science_categories = 0
+
+for(c in categories) {
+  if("science" %in% c) {
+    n_science_categories = n_science_categories + 1
+  }
+}
+
+
+science_obs = c(n_science_categories, n_questions - n_science_categories) # Finding science observed value
+
+p_expected = c(1/3369, 3368/3369) # probability of value
+
+chisq.test(science_obs, p = p_expected) # chi squared test
+```
+
+```{r data_5_2}
+# history category
+n_history_categories = 0
+
+for (c in categories) {
+  if("history" %in% c) {
+    n_history_categories = n_history_categories + 1
+  }
+}
+
+history_obs = c(n_history_categories, n_questions - n_history_categories) # Finding history observed value
+
+p_expected = c(1/3369, 3368/3369) # probability of value
+
+chisq.test(history_obs, p = p_expected) # chi squared test
+```
+
+```{r data_5_3}
+# Shakespeare category
+n_shakespeare_categories = 0
+
+for (c in categories) {
+  if("Shakespeare" %in% c) {
+    n_shakespeare_categories = n_shakespeare_categories + 1
+  }
+}
+
+shakespeare_obs = c(n_shakespeare_categories, n_questions - n_shakespeare_categories) # Finding shakespeare observed value
+
+p_expected = c(1/3369, 3368/3369) # probability of value
+
+chisq.test(shakespeare_obs, p = p_expected)
+```
+
+We see p-values less than 0.05 for each of the hypothesis tests. From this, we would conclude that we should reject the null hypothesis that science doesn't have a higher prevalence than other topics in the Jeopardy data. We would conclude the same with history and Shakespeare.
+
+## Unique Terms In Questions
+
+Let's say you want to investigate how often new questions are repeats of older ones. We're only working with about 10% of the full Jeopardy question dataset, but you at least start investigating this question. To start on this process, we can do the following:
+
+1. Sort jeopardy in order of ascending air date.
+2. Initialize an empty vector to store all the unique terms that are in the Jeopardy questions.
+3. For each row, split the value for question into distinct words, remove any word shorter than 6 characters, and check if each word occurs in terms_used. 
+    - If it does not, add the word to the unique term vector
+    
+This vector of terms will enable you to check if they have been used previously or not in future questions. Only looking at words greater than 6 characters enables you to filter out stop words like the and than, which are commonly used, but don't tell you a lot about a question. This vector will also help us set up for another hypothesis test after this screen.
+
+### Instructions
+
+1. Create an empty vector called terms_used.
+2. Sort jeopardy by ascending air date.
+3. Get the question column into its own character vector and iterate through each question:
+    - split each question into another character vector based on individual words
+    - See if any of the words are greater or equal than 6 letters and if they are currently in terms_used, and add them to the list if a word satisfies these criteria
+
+```{r data_6}
+# Pull just the questions from the jeopardy data
+questions = pull(jeopardy, question)
+terms_used = character(0)
+
+for (q in questions) {
+  # Split the sentence into distinct words
+  split_sentence = str_split(q, " ")[[1]]
+  
+  # Check if each word is longer than 6 and if it's currently in terms_used
+  for (term in split_sentence) {
+    if (!term %in% terms_used & nchar(term) >= 6) {
+      terms_used = c(terms_used, term)
+    }
+  }
+}
+```
+
+## Terms In Low and High Value Questions
+
+Let's say you only want to study terms that have high values associated with it rather than low values. This optimization will help you earn more money when you're on Jeopardy while reducing the number of questions you have to study. To do this, we need to count how many high value and low value questions are associated with each term. For our exercise, we'll define low and high values as follows:
+
+  - Low value: Any row where value is less than 800.
+  - High value: Any row where value is greater or equal than 800.
+    
+For each category, we can see that under this definition that for every 2 high value questions, there are 3 low value questions. Once we count the number of low and high value questions that appear for each term, we can use this information to our advantage. If the number of high and low value questions is appreciably different from the 2:3 ratio, we would have reason to believe that a term would be more prevalent in either the low or high value questions. We can use the chi-squared test to test the null hypothesis that each term is not distributed more to either high or low value questions. 
+
+### Instructions
+
+1. Create an empty dataset that you can add more rows to
+2. Iterate through all the different terms in terms_used.
+3. For each term:
+    - Iterate through all of the questions in the dataset and see if the term is present in each question. Since we're iterating a lot here, it might be useful to test your code on only a few terms to make sure that your code works correctly before going through the entire list of terms.
+    - If the term is present in the question, we then need to check if the question is high or low value
+    - After iterating through all the questions, test the null hypothesis using the information we discussed on this screen.
+    - Each term should be associated with a high value question count, a low value question count, and a p-value. Turn these values into a vector and append it to the empty dataset you created.
+4. Finally, investigate the resulting dataset and see what terms are associated with the lowest p-values and the higher proportions of high value questions. Write your findings in your RMarkdown file.
+
+```{r data_7_1}
+values = pull(jeopardy, value)
+value_count_data = NULL
+
+for (term in terms_used[1:20]) {
+  n_high_value = 0
+  n_low_value = 0
+  
+  for (i in 1:length(questions)) {
+    # Split the sentence into a new vector
+    split_sentence = str_split(questions[i], " ")[[1]]
+    
+    # Detect if the term is in the question and its value status
+    if (term %in% split_sentence & values[i] >= 800) {
+      n_high_value = n_high_value + 1
+    } else if (term %in% split_sentence & values[i] < 800) { 
+      n_low_value = n_low_value + 1
+    }
+  }
+  
+  # Testing if the counts for high and low value questions deviates from what we expect
+  test = chisq.test(c(n_high_value, n_low_value), p = c(2/5, 3/5))
+  new_row = c(term, n_high_value, n_low_value, test$p.value)
+  
+  # Append this new row to our
+  value_count_data = rbind(value_count_data, new_row)
+  
+}
+```
+
+```{r data_7_2}
+# Take the value count data and put it in a better format
+tidy_value_count_data = as_tibble(value_count_data)
+colnames(tidy_value_count_data) = c("term", "n_high", "n_low", "p_value")
+
+head(tidy_value_count_data)
+```
+
+We can see from the output that some of the values are less than 5. Recall that the chi-squared test is prone to errors when the counts in each of the cells are less than 5. We may need to discard these terms and only look at terms where both counts are greater than 5.

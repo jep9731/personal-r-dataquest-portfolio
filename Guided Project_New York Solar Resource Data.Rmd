@@ -1,0 +1,456 @@
+---
+title: "Guided Project New York Solar Resource Data"
+author: "Joshua Pasaye"
+date: "2023-08-10"
+output: html_document
+---
+
+# R Markdown
+
+We want to look at the Solar Resource data. This data is about various solar data types for a location. Specifically, we'll work with these output fields:
+
+  -The Average Direct Normal Irradiance (avg_dni): Direct Normal Irradiance is the amount of solar radiation a surface receives per unit area.
+  -The Average Tilt at Latitude (avg_lat_tilt): Tilt at Latitude is the amount of radiation a surface receives per unit area that doesn't arrive on a direct path from the sun.
+  -The Average Global Horizontal Irradiance (avg_ghi): Global Horizontal Irradiance is the total amount of shortwave radiation a surface horizontal to the ground receives from above.
+
+## Finding the Suitable Endpoint and Parameters to Query the API
+
+If you don't have one, we invite you to get one here by following this workflow:
+
+  -Enter your first name, your last name, and your email address.
+  -You'll receive an email containing your API Key.
+
+Once you have your access key, the next step is to determine the URL (endpoint) and the parameters to query the API. Look at the documentation for this information.
+
+To create a named list in R, we use the following syntax:
+
+```{r,}
+#the_list <- list(element_name_1 = element_1, element_name_2 = element_2)
+```
+
+### Instructions
+
+1. Store your API key in a variable.
+2. Identify and store the API URL we'll need to extract the New York City Solar Resource data in JSON format.
+3. Store the three parameters to request the New York City solar data as a list.
+    -The api_key parameter contains your API key.
+    -The latitude (lat) of New York City is 41.
+    -The longitude (lon) of New York City is -75.
+    -Save the list as parameters_list.
+
+```{r}
+#Store api_key in a variable
+the_key <- "8ozsSZYItMno7HS1F2su6zCCYTgsotb9B5Wku8iW"
+
+#Identify the URL
+url <- "https://developer.nrel.gov/api/solar/solar_resource/v1.json"
+
+#List of parameters
+parameters_list <- list(api_key = the_key, lat = 41, lon = -75)
+```
+
+## Extracting the New York Solar Resource Data
+Now that we have identified the URL and the parameters we need to query the API. We can use this information to extract New York City solar resources data.
+
+Here is the basic code snippet to query an API and get the desired content as a reminder.
+```{r}
+# Load httr library
+
+library(httr)
+# API requests
+response <- GET(url, query = parameters_list)
+
+# Check the status of the request
+status <- status_code(response)
+
+# Extracting content
+content <- content(response)
+```
+
+When the API request goes well, the status code is 200, and the returned content is in JSON format.
+
+### Instructions
+
+1. Load the httr package.
+2. Use the GET() function to request the data from the API with url and parameters_list.
+3. Track errors.
+    -Display the status code with the status_code() function.
+    -Display the API response format.
+4. Extract the API response content as text.
+5. Display this content, and check it.
+
+```{r}
+# Load  httr library
+library(httr)
+
+# Use GET() function
+response <- GET(url, query = parameters_list)
+
+# Track errors
+## Display status
+status <- status_code(response)
+status
+## Display API response type
+response_type <- http_type(response)
+response_type
+
+# Extract API response as content as text
+content <- content(response, "text")
+
+# Dispaly API content as text
+print(content)
+```
+
+## Parsing the JSON into an R Object
+We received the API response content as a JSON text. We need to convert this text into a manipulable R object.
+
+To do this, we can use the fromJSON() function of the jsonlite package.
+
+We can then display this R object's structure to see if it meets our expectations.
+
+If we create an R object (here a complex list) and display its structure with the str() function, it looks like this:
+
+```{r}
+complex_list <- list(a = 2, b = list( u = list(p = list(x = 1:3), q = list(x = 3:5))), c = month.abb)
+str(complex_list)
+```
+
+Note the presence of month.abb which is a built-in to R variable that represents the month abbreviations (in three letters). It's a shortcut for c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec").
+
+We can identify the following in complex_list:
+
+  -The nested objects
+  -The size of each object
+  -The object type
+  -Each element's content
+
+### Instructions
+
+1. Parse the API response content to an R object using the jsonlite::fromJSON() function.
+      -Store the result as json_lists.
+2. Display the structure of the R object using the str() function.
+
+```{r}
+# Parse API response
+json_list <- jsonlite::fromJSON(content)
+
+# Display structure of the R object using the 'str()' function
+str(json_list)
+```
+
+## How to Create a Dataframe from a Complex List
+The processing of the API response content is at the core of querying APIs. It often comes in the form of a complex R object that requires parsing.
+
+Basically, as you might notice in the extraction workflow, we proceed step by step by displaying each output. We do this because if we don't understand the structure of the response, we can't easily parse it.
+
+After parsing the JSON data to an R object on the previous screen, we get a complex list. We'll need to convert this list into a dataframe.
+
+```{r}
+#text List of 6 $ version : chr "1.0.0" $ warnings: list() $ errors : list() $ metadata:List of 1 ..$ sources: chr "Perez-SUNY/NREL, 2012" $ inputs :List of 2 ..$ lat: chr "41" ..$ lon: chr "-75" $ outputs :List of 3 ..$ avg_dni :List of 2 .. ..$ annual : num 3.69 .. ..$ monthly:List of 12 .. .. ..$ jan: num 3.12 .. .. ..$ feb: num 3.36 .. .. ..$ mar: num 4.1 .. .. ..$ apr: num 4.07 .. .. ..$ may: num 4.15 .. .. ..$ jun: num 4.17 .. .. ..$ jul: num 4.6 .. .. ..$ aug: num 4.14 .. .. ..$ sep: num 4.02 .. .. ..$ oct: num 3.26 .. .. ..$ nov: num 2.58 .. .. ..$ dec: num 2.72 ..$ avg_ghi :List of 2 .. ..$ annual : num 3.87 .. ..$ monthly:List of 12 .. .. ..$ jan: num 1.97
+```
+
+-First, we're interested in the nested list monthly for each average variable: avg_dni, avg_ghi, and avg_lat_tilt.
+-Second, we have to convert these lists into a dataframe.
+-Third, we can visualize the dataframe.
+
+## Building a Dataframe from a Complex List
+To convert a complex list into a dataframe, the first approach consists of extracting each element from the complex list and combining them into the desired output. Doing this requires basic knowledge of data structures like lists and dataframes.
+
+Let's use our previous example.
+
+```{r}
+complex_list <- list(a = 2, b = list( u = list(p = list(x = 1:3), q = list(x = 3:5))), c = month.abb)
+str(complex_list)
+```
+
+We can extract the x vectors and combine them into a dataframe using the following code snippet:
+
+```{r}
+p_x <- complex_list$b$u$p$x
+q_x <- complex_list$b$u$q$x
+
+df <- tibble::tibble("p" = p_x, "q" = q_x)
+df
+```
+
+The output looks like this:
+
+```{r}
+# A tibble: 3 x 2
+#      p     q
+#  <int> <int>
+#1     1     3
+#2     2     4
+#3     3     5
+```
+
+### Instructions
+
+1. Extract the outputs list from json_lists.
+2. Extract the monthly vector (monthly) from the following lists:
+    -avg_dni
+    -avg_ghi
+    -avg_lat_tilt.
+3. Combine the monthly vectors into a dataframe using the tibble::tibble() function.
+    -Add the month column containing month abbreviations: Jan, Feb, . . . ,Dec.
+        -The month column should appear on the left side of the dataframe.
+4. Save the result as dataframe.
+5. Display the dataframe.
+    -What do you notice, and what impact can this have on future uses of this dataframe?
+
+```{r}
+# Extract outputs from json_list
+outputs_list <- json_list$outputs
+
+# Extract the monthly vectors
+avg_dni <- outputs_list$avg_dni$monthly
+avg_ghi <- outputs_list$avg_ghi$monthly
+avg_lat_tilt <- outputs_list$avg_lat_tilt$monthly
+
+# Combine monthly vectors to dataframe
+dataframe <- tibble::tibble(month = month.abb, 
+                    avg_dni = avg_dni,
+                    avg_ghi = avg_ghi,
+                    avg_lat_tilt = avg_lat_tilt)
+
+# Display dataframe
+dataframe
+```
+
+## Extracting a Dataframe from a Complex List
+To convert a complex list into a dataframe, the second approach consists of simplifying the complex list and restructuring it into the desired output. Doing this requires basic knowledge of data structures such as matrices, lists, and dataframes.
+
+Let's use our previous example.
+
+```{r}
+complex_list <- list(a = 2, b = list( u = list(p = list(x = 1:3), q = list(x = 3:5))), c = month.abb)
+str(complex_list)
+```
+
+We can simplify the u list and restructure the result into a dataframe using the following code snippet.
+
+```{r}
+# Simplifying the list
+u_list <- unlist(complex_list$b$u)
+u_list
+
+# Restructuring the new list into a matrix
+u_matrix <- matrix(u_list, nrow = 3)
+u_matrix
+
+# Converting the matrix into a dataframe
+df <- as.data.frame(u_matrix)
+df
+```
+
+The output looks like this:
+
+```{r}
+#p.x1 p.x2 p.x3 q.x1 q.x2 q.x3 
+#   1    2    3    3    4    5
+
+#     [,1] [,2]
+#[1,]    1    3
+#[2,]    2    4
+#[3,]    3    5
+
+
+#  V1 V2
+#1  1  3
+#2  2  4
+#3  3  5
+```
+
+Here are the workflow steps.
+
+    -Use the unlist() function to simplify the list. It consists of removing all sub-hierarchies from the list (lists or nested elements) and returns a simple named vector.
+    -Use the matrix() function to restructure the vector into a two-dimensional R object, matrix.
+    -Use the as.data.frame() function to convert this matrix into a dataframe.
+
+We can usually apply this workflow to any complex list (including ours) to get a dataframe. It often requires some operations afterward, such as removing extra lines using either negative indexing or filtering.    
+
+```{r}
+# Removing the second row
+df[-2, ]
+
+# Removing the first and second rows
+df[c(-1, -2), ]
+
+# Filtering df where V2 is odd using the `filter()` function from the `dplyr` package
+library(dplyr)
+df %>% filter(V2 %% 2 == 1)
+```
+
+If you're not familiar with these operations, explore our course about R data structures. Now it's your turn!
+
+Here is the structure of json_lists as a reminder:
+
+```{r}
+#text List of 6 $ version : chr "1.0.0" $ warnings: list() $ errors : list() $ metadata:List of 1 ..$ sources: chr "Perez-SUNY/NREL, 2012" $ inputs :List of 2 ..$ lat: chr "41" ..$ lon: chr "-75" $ outputs :List of 3 ..$ avg_dni :List of 2 .. ..$ annual : num 3.69 .. ..$ monthly:List of 12 .. .. ..$ jan: num 3.12 .. .. ..$ feb: num 3.36 .. .. ..$ mar: num 4.1 .. .. ..$ apr: num 4.07 .. .. ..$ may: num 4.15 .. .. ..$ jun: num 4.17 .. .. ..$ jul: num 4.6 .. .. ..$ aug: num 4.14 .. .. ..$ sep: num 4.02 .. .. ..$ oct: num 3.26 .. .. ..$ nov: num 2.58 .. .. ..$ dec: num 2.72 ..$ avg_ghi :List of 2 .. ..$ annual : num 3.87 .. ..$ monthly:List of 12 .. .. ..$ jan: num 1.97
+```
+
+When we simplify and restructure the outputs list, the first row of our matrix will be the annual values that we have to remove.
+
+### Instructions
+
+1. Extract the outputs list from json_lists.
+2. Simplify the outputs list.
+3. Restructure the simplified list into a matrix of 13 rows (the annual value and the 12 months' values).
+4. Remove the annual values (the first row) from the data matrix.
+5. Convert the matrix into a dataframe using the as.data.frame() function.
+6. Display the dataframe.
+      -What difference do you see between the first approach and this one?
+
+```{r}
+# Extract outputs list
+outputs_list <- json_list$outputs
+
+# Simply list
+simplified_output_list <- unlist(outputs_list)
+
+# Restructure the simplified list
+data_matrix <- matrix(simplified_output_list, nrow = 13)
+
+# Remove the annual values
+data_matrix_removed <- data_matrix[-1, ]
+
+# Convert matrix into a dataframe
+data_frame_new <- as.data.frame(data_matrix_removed)
+
+#Display dataframe
+data_frame_new
+```
+
+## Putting It All together
+Congratulations! If you've made it this far, then you've mastered APIs in R (even the most complex ones). As we have done in previous lessons, we recommend creating a function to extract future data using this API. So we'll create the custom nrel_api_json_get_df() function to extract solar resource data.
+
+Here's an example of a function we wrote earlier that you could use as inspiration.
+
+```{r}
+wb_api_json_get_df <- function(endpoint, queries = list()) {
+
+  # Preparing the URL 
+  url <- modify_url("http://api.worldbank.org", path = endpoint)
+
+  # API requests
+  response <- GET(url, query = queries)
+
+  # Tracking errors
+  if ( http_error(response) ){
+    print(status_code(response))
+    print(http_status(response))
+    stop("Something went wrong.", call. = FALSE)
+  }
+
+  if (http_type(response) != "application/json") {
+    stop("API did not return json", call. = FALSE)
+  }
+
+  # Extracting content
+  json_text <- content(response, "text")
+
+  # Converting content into Dataframe
+  dataframe <- jsonlite::fromJSON(json_text)
+
+  # Return the dataframe  
+  dataframe[[2]]
+}
+```
+
+### Instructions
+
+1. Load the packages: httr and dplyr.
+2. Create the custom nrel_api_json_get_df() function based on what we did in previous lessons.
+      -Copy-paste and modify it accordingly for this purpose.
+      -Convert the content into a dataframe.
+3. Use the custom nrel_api_json_get_df() function to extract the solar resource as a dataframe.
+      -Provide the "api/solar/solar_resource/v1.json" as the endpoint parameter.
+      -Provide the parameters_list variable as queries parameter.
+      -Save the result as solar_resource_df.
+4. Print the output dataframe.
+
+```{r}
+library(httr)
+library(dplyr)
+the_key = "8ozsSZYItMno7HS1F2su6zCCYTgsotb9B5Wku8iW" 
+# Creating the custom `nrel_api_json_get_df()` function inspiring from what we did in the previous missions
+## The function has two parameters
+### The `endpoint` parameter represents the endpoint we need
+### The `queries` parameter represents the list of API request parameters.
+nrel_api_json_get_df <- function(endpoint, queries = list()) {
+  ## Preparing the URL 
+  url <- modify_url("https://developer.nrel.gov", path = endpoint)
+  ## Querying the API
+  response <- GET(url, query = queries)
+  ## Tracking errors
+  if ( http_error(response) ){
+    print(status_code(response))
+    print(http_status(response))
+    stop("Something went wrong.", call. = FALSE)
+  }
+  if (http_type(response) != "application/json") {
+    stop("API did not return json", call. = FALSE)
+  }
+  ## Extracting content
+  json_text <- content(response, "text")
+  ## Converting content into Dataframe
+  table_lst <- jsonlite::fromJSON(json_text)
+  dataframe <- tibble::tibble("month" = month.abb,
+                              "avg_dni" = as.numeric(table_lst$outputs$avg_dni$monthly),
+                              "avg_ghi" = as.numeric(table_lst$outputs$avg_ghi$monthly),
+                              "avg_lat_tilt" = as.numeric(table_lst$outputs$avg_lat_tilt$monthly))
+  ## Returning the dataframe  
+  dataframe
+}
+# Using the custom `nrel_api_json_get_df()` function to extract the solar resource as a dataframe
+## Providing the `"api/solar/solar_resource/v1.json"` as the `endpoint` parameter
+## Providing the `parameters_list` variable as `queries` parameter
+solar_resource_df <- nrel_api_json_get_df("api/solar/solar_resource/v1.json", parameters_list)
+# Printing the output dataframe
+solar_resource_df
+```
+
+## Visualizing New York City Solar Resource Data
+We can now visualize the New York City average direct solar irradiation for each month.
+
+The expected plots are as follows.
+    -New York solar direct irradiation for each month ordered alphabetically.
+    -New York solar direct irradiation for each month ordered chronologically.
+    -We notice that solar irradiation is the highest in New York City around July. This period corresponds to summer.
+
+### Instructions
+
+1. Load the ggplot2 and dplyr packages.
+2. Create the first plot with the following settings:
+      -Use the ggplot() function to plot (for each month) the average direct irradiation (avg_dni) from solar_resource_df.
+      -Use geom_line() and geom_point() functions to get a line plot with a dot for each value.
+      -Use the theme_bw() theme.
+4. Create the second plot with the following settings:
+      -Convert the month column into a factor using the following command: solar_resource_df <- solar_resource_df %>% mutate(month = factor(month, levels = month.abb)).
+      -Reproduce the first plot with the same settings. You can copy-paste the first plot code snippet.
+5. What do you notice comparing both plots?
+      -What have you learned about this command solar_resource_df <- solar_resource_df %>% mutate(month = factor(month, levels = month.abb))?
+
+```{r}
+# Load Libraries
+library(ggplot2)
+library(dplyr)
+
+# Create first plot
+ggplot(data = solar_resource_df,
+       aes(x = month, y = avg_dni, group = 1)) +
+  geom_line() +
+  geom_point() +
+  theme_bw()
+
+# Create second plot
+solar_resource_df <- solar_resource_df %>% mutate(month = factor(month, levels = month.abb))
+ggplot(data = solar_resource_df,
+       aes(x = month, y = avg_dni, group = 1)) +
+  geom_line() +
+  geom_point() +
+  theme_bw()
+
+# Answer
+##The first plot x-axis is ordered alphabetically, while the second is ordered chronologically from January to December. This operation allows ordering the labels in the plot as we wish.
+```

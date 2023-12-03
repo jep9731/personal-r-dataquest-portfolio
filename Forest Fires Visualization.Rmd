@@ -1,0 +1,362 @@
+---
+title: 'Guided Project: Analyzing Forest Fire Data'
+author: "Joshua Pasaye"
+date: "2023-05-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+setwd("C://Users//joshp//OneDrive//Desktop//Data Quest")
+```
+
+# 1 of 6 · The Importance of Forest Fire Data
+
+## Learn
+
+Forest fires can create ecological problems and endanger human lives and property. Understanding when they occur and what causes them is important for managing them. The data we'll be working with in this guided project is associated with a scientific research paper on predicting the occurrence of forest fires in Portugal using modeling techniques. 
+
+We will not use any type of modeling on this project, but rather we'll focus on visualizing it. In this project, though, we'll perform exploratory analyses on the data to better understand it and any relationships that might be present in it. Remember, exploring data visually is often the first step data scientists take when working with new data.
+
+Here are descriptions of the variables in the data set and the range of values for each taken from the paper:
+
+  X: X-axis spatial coordinate within the Montesinho park map: 1 to 9
+  Y: Y-axis spatial coordinate within the Montesinho park map: 2 to 9
+  month: Month of the year: 'jan' to 'dec'
+  day: Day of the week: 'mon' to 'sun'
+  FFMC: Fine Fuel Moisture Code index from the FWI system: 18.7 to 96.20
+  DMC: Duff Moisture Code index from the FWI system: 1.1 to 291.3
+  DC: Drought Code index from the FWI system: 7.9 to 860.6
+  ISI: Initial Spread Index from the FWI system: 0.0 to 56.10
+  temp: Temperature in Celsius degrees: 2.2 to 33.30
+  RH: Relative humidity in percentage: 15.0 to 100
+  wind: Wind speed in km/h: 0.40 to 9.40
+  rain: Outside rain in mm/m2 : 0.0 to 6.4
+  area: The burned area of the forest (in ha): 0.00 to 1090.84
+
+The X and Y variables are coordinates of fire locations. While we have not yet worked with visualizing spatial data, you will learn to do so in an upcoming course. We will put this concept aside for now.
+
+The acronym FWI stands for "fire weather index", a method used by scientists to quantify risk factors for forest fires. You can read more about the FWI system and the variables included in this data set here if you'd like. 
+
+### Instructions
+
+1. Take a look at the data itself and familiarize yourself with it. Here are some guiding questions that you will want to answer as you look at the data:
+
+  -What does a single row represent?
+  -With what I know about fires, how might each of the variables related to fires themselves? This might involve looking up each variable quickly on a search engine and getting a better grasp of what it is.
+
+```{r data, echo=TRUE}
+# Load data
+forest_fires <- read.csv("forestfires.csv")
+
+# What does a single row represent?
+glimpse(forest_fires)
+```
+
+# 2 of 6 · Data Processing
+
+## Learn
+
+Before we dive into the data, let's have a look at the month and day variables:
+
+```{r example, echo=TRUE}
+forest_fires %>% pull(month) %>% unique
+
+forest_fires %>% pull(day) %>% unique
+```
+
+If we were to just use these variables as is, then R would automatically sort them by alphabetical order. We know that they have an inherent order, so we should enforce this order on the data itself. Thankfully, now that we know about factors, we can do this conversion and make sure that R knows about this inherent order.
+
+### Instructions
+
+1. Convert the month variable into a categorical variable, and make sure that the months in the data are ordered correctly. 
+
+2. Convert the day variable into a categorical variable too. Different regions use different days of the week as the "starting" day, so choose the one that suits you. There's no one correct answer for this one, the processing helps us organize the data in a more familiar way.
+
+```{r converting data, echo = TRUE}
+# Converting month and day variables into a categorical variable
+months = c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+days = c("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+forest_fires <- forest_fires %>%
+  mutate(
+    day = factor(day, levels = days),
+    month = factor(month, levels = months)
+  )
+```
+
+# 3 of 6 · When Do Most Forest Fires Occur?
+
+## Learn
+
+When it comes to understanding forest fires and what can be done to manage them, it is helpful to have an idea of when the fires are most likely to occur. For example, there is a notion of a fire season in the state of California in the United States between May and October, thanks to the summer heat.
+
+We've seen two variables concerning time: month and day. These two columns allow us to ask:
+
+  -Which months do forest fires happen the most?
+  -Which days of the week do forest fires happen the most?
+
+These questions involve counts of forest fires. With this in mind, what visualization do you think best accomplishes this task? As we learned in the Data Distributions lesson, bar charts and density plots will do the job here. 
+
+The problem is that the data in its current form describes individual fires. It would be easier to plot the data if it is grouped up by month or day of the year before going to ggplot. We can think of month and day as grouping variables that we can use with the group_by() and summarize() functions. This duo of functions will help us create the new tibbles we need to plot. 
+
+### Instructions
+
+1. Create a tibble that counts the number of forest fires by month.
+  
+  -In order to count rows, we have a few options on how to calculate this. We can use the nrow() function, or we can also use the n() function to count the number of rows within summarize().
+
+2. Create a tibble that counts the number of forest fires by day of the week.
+
+3. Using each of the tibbles that you created, create a visualization that allows us to answer the questions that we have put forth on this screen.
+
+4. Using your visualizations, write some notes to yourself on when forest fires are most common. One good practice is to try to accompany a visualization with a bit of writing that describes its key focal points. Even though a visualization should always be able to stand alone, it's helpful to a reader to understand immediately what the point of a graph is.
+
+5. Make sure to give your plot informative axes labels and an accurate title too! All of your plots should be able to describe themselves to an uninformed reader.
+
+```{r plotting graphs, echo=TRUE}
+# Question 1
+month_summary <- forest_fires %>% group_by(month) %>% summarise(
+  num_of_fires = n()
+) %>% arrange(num_of_fires)
+
+# Question 2
+day_summary <- forest_fires %>% group_by(day) %>% summarise(
+  num_of_fires = n()
+) %>% arrange(num_of_fires)
+
+# Question 3: Month
+month_summary %>% 
+  ggplot(aes(x = month, y = num_of_fires)) +
+  geom_col(fill = "orange", alpha = 1) +
+  labs(
+    title = "Number of Fires per Month",
+    x = "Month",
+    y = "Number of Fires"
+  ) + geom_text(
+    aes(label = num_of_fires), 
+    position = position_stack(vjust = .5), 
+    color = "black"
+  ) + theme(
+    panel.background = element_rect(fill = "white"), 
+    panel.grid.major.y = element_line(color="gray", size=0.5), 
+    axis.ticks = element_blank()
+        )
+
+# Question 3: Days
+day_summary %>% 
+  ggplot(aes(x = day, y = num_of_fires)) +
+  geom_col(fill = "orange", alpha = 1) +
+  labs(
+    title = "Number of Fires per Day",
+    x = "Day of the Week",
+    y = "Number of Fires"
+  ) + geom_text(
+    aes(label = num_of_fires), 
+    position = position_stack(vjust = .5), 
+    color = "black"
+  ) + theme(
+    panel.background = element_rect(fill = "white"), 
+    panel.grid.major.y = element_line(color="gray", size=0.5), 
+    axis.ticks = element_blank()
+        )
+```
+
+Forest fires are most likely to occur in August or September months with 184 and 172 fires per month, respectively. Additionally, Sundays are the day of the week where forest fires are most likely to occur with 95 fires total in the data.
+
+# 4 of 6 · Plotting Other Variables Against Time
+
+## Learn
+
+From our graphs, we saw that August and September see more forest fires than other months. It also looks as though the weekend days (Friday, Saturday, and Sunday) have more forest fires than days in the middle of the week.
+
+To explore the temporal patterns of forest fire occurrence the bar charts reveal, we should look more closely at how the variables that relate to forest fires vary by month and by day of the week. We should see how each of the other variables in the dataset relates to month. We'll exclude day for now since it's really the months that can vary a lot between seasons.
+
+We have the following columns:
+
+  FFMC
+  DMC
+  DC
+  ISI
+  temp
+  RH
+  wind
+  rain
+
+Let's create some visualizations that look at the relationship between month and each of the columns above. There are multiple ways to go about this, so go with what feels comfortable to you. See if any of the variables have values that stand out during August and September, which we've previously confirmed sees a lot of fires.
+
+In other words, we're looking for possible relationships between the columns and time. Knowing that these relationships will give us possible paths to dig deeper to for analysis later on. Note that we want to graph multiple columns in the dataset along the same x-axis: month. In these cases, the pivot_longer() function can offer us a quick way to plot everything at once in combination with facet_wrap() or facet_grid().
+
+One potential problem we need to note with this approach is that facet_wrap()/facet_grid() automatically gives each subplot the same axis limits. While this can be useful on some occasions, it can hurt our ability to see patterns in the data if their scales are different. In this case, we can tell facet_wrap()/facet_grid() to have each subplot adapt its axis limits to the variable being plotted through the scales argument. If we specify scales = "free_y" within facet_wrap()/facet_grid(), then each plot will adapt.
+
+You may also find that your resulting plots are too small to really view correctly in your R Markdown file. You can refer to this documentation to see how you can change the size of a rendered plot for easier inspection.
+
+### Instructions
+
+1. Create a visualization(s) that help look at the relationship between each of the columns described above with month. 
+    -if you want to, do these visualizations again with day to search for if there's any relationships there. Our solutions will only look at month
+    -if you use facet_wrap() or facet_grid(), make sure you use scales = "free_y" to make sure each plot is on its own scale
+
+2. Take note of any variables that show values that stand out in August or September. Knowing what the variables represent, how do you think these relate to the forest fires themselves?
+
+```{r long table, echo=TRUE}
+# Creating long table
+forest_fires_long <- forest_fires %>%
+  pivot_longer(
+    cols = c(FFMC, DMC, DC, ISI, temp, RH, wind, rain),
+    names_to = "factors",
+    values_to = "value"
+  )
+```
+
+```{r facet month visualizations, echo=TRUE}
+# Creating a variable to show relationship for month and each variable
+forest_fires_long %>%
+  ggplot(aes(x = month, y = value, fill = month)) +
+  geom_col() +
+  labs(title = "Relationship Between Months and FWI Factors") +
+  facet_wrap(scales = "free_y",
+             vars(factors)
+  ) + 
+  theme(
+    axis.ticks = element_blank(),
+    axis.text = element_blank()
+  )
+```
+
+It looks like the months August and September have the highest values for each factor
+
+```{r day of week visualization, echo=TRUE}
+# Create a variable to show relationship for days of the week and each variable
+forest_fires_long %>%
+  ggplot(aes(x = day, y = value, fill = day)) +
+  geom_col() +
+  labs(title = "Relationship Between Days of the Week and FWI Factors") +
+  facet_wrap(scales = "free_y",
+             vars(factors)
+  ) + 
+  theme(
+    axis.ticks = element_blank(),
+    axis.text = element_blank()
+  )
+```
+
+It looks like Sunday has the hightest values for each factor
+
+# 5 of 6 · Examining Forest Fire Severity
+
+## Learn
+
+Let's investigate further! So far, we've only looked at the relationship between the variables in the data and the frequency of forest fires. Fires can also range in intensity too, so it might be useful to know what factors influence this as well.
+
+Looking at the data immediately though, there is no variable that describes just "severity". Many times in analysis, we'll be interested in a variable, but simply won't have the data for it. In these cases, we often have to look at proxies, or a kind of "representation" of severity. In this data set, the area variable contains data on the number of hectares of forest that burned during the forest fire. We'll use this variable as an indicator of the severity of the fire. The idea behind using area as a proxy is that worse fires will result in a larger burned area. Of course, this won't be true in all cases, but it is a reasonable assumption to make.
+
+Let's create scatter plots to see what can be learned about relationships between the area burned by a forest fire and the following variables: 
+
+  FFMC: Fine Fuel Moisture Code index from the FWI system: 18.7 to 96.20
+  DMC: Duff Moisture Code index from the FWI system: 1.1 to 291.3
+  DC: Drought Code index from the FWI system: 7.9 to 860.6
+  ISI: Initial Spread Index from the FWI system: 0.0 to 56.10
+  temp: Temperature in Celsius degrees: 2.2 to 33.30
+  RH: Relative humidity in percentage: 15.0 to 100
+  wind: Wind speed in km/h: 0.40 to 9.40
+  rain: Outside rain in mm/m2 : 0.0 to 6.4
+
+In this case, we're interested in whether the variables above may affect forest fire area. For that reason, you should place area on the y-axes and the other variables on the x-axes of your scatter plots.
+
+Just as on the last screen, differences in scale can affect the visualization if you use facet_wrap() or facet_grip(). Since the x-axis is changing with each column, we would need to specify scales = "free_x" in the function call. 
+
+### Instructions
+
+1. Create a visualization(s) that help look at the relationship between each of the columns described above with area. 
+    -if you use facet_wrap() or facet_grid(), make sure you use scales = "free_x" to make sure each plot is on its own scale
+
+2. Take note of any variables that show values that stand out in terms of area. Knowing what the variables represent, how do you think these relate to the forest fires themselves?
+
+```{r area facet visualization, echo=TRUE}
+forest_fires_long %>%
+  ggplot(aes(x = value, y = area)) +
+  geom_point(color = "light blue") +
+  labs(title = "Relationship Between FWI Factors And Burned Area") +
+  facet_wrap(scales = "free_x",
+             vars(factors)) + 
+  theme(axis.ticks = element_blank())
+```
+
+Most of the values are clustered towards the 0. This is probably because most of the forest fires didn’t burn
+up to a hectare of the forest. We can visualize the area on a histogram to see how it is distributed.
+
+# 6 of 6 · Outlier Problems
+
+## Learn
+
+Let's interpret your scatter plots, which may look similar to these: 
+
+```{r area facet visualizations, echo=FALSE}
+forest_fires_long %>%
+  ggplot(aes(x = value, y = area)) +
+  geom_point(color = "light blue") +
+  labs(title = "Relationship Between FWI Factors And Burned Area") +
+  facet_wrap(scales = "free_x",
+             vars(factors)
+  ) + 
+  theme(
+    axis.ticks = element_blank()
+  )
+```
+
+It's hard to understand relationships between variables when you look at these plots. There are a few points representing very large values of area, and many points representing values of area that are zero or close to zero. As a result, most points are clustered around the bottom of the plots.
+
+A histogram of the area variable values clearly illustrates the distribution and why the scatter plots look the way they do: 
+
+```{r histogram example, echo=FALSE}
+forest_fires %>%
+  ggplot(aes(x = area)) +
+  geom_histogram()
+```
+
+There are outliers in the area column, which represent fires that caused inordinate amounts of damage compared to the other fires in the data. To more clearly visualize relationships between variables, you can experiment with filtering the data frame by values of area and plotting subsets:
+
+  -All data except for rows with very high values of area
+  -All data except for rows with zero values of area
+  -Data with values of area that fall within a specified range
+
+### Instructions
+
+1. Do some filtering on area and reexamine your plots. Do you see any interesting relationships between forest fire area and the other variables you investigated? 
+
+2. If you do not see any interesting relationships, what might that tell you about our assumption that forest fire area is related to forest fire severity?
+
+```{r histograms for area burned, echo=TRUE}
+forest_fires %>%
+  ggplot(aes(x = area)) +
+  geom_histogram(fill = "orange", bins = 20, binwidth = 20) +
+  labs(title = "Distribution Of Forest Area Burnt") +
+  theme(axis.ticks = element_blank(),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color="gray", size=0.5)
+        )
+```
+
+The histogram confirms our assumption. Most of the values for the area are clustered around 0. We are going
+to recreate the scatter plot from before but this time we will only look at values greater than 0 and less than
+the mean area burnt
+
+```{r area and FIW systems, echo=TRUE}
+# Creating new area variable with average
+mean_area <- forest_fires %>% pull(area) %>% mean()
+
+# Re-plotting area & FIW systems graphs
+forest_fires_long %>% filter(area <= mean_area & area != 0) %>% ggplot(
+  aes(x = value, y = area)) +
+  geom_point(color = "lightblue") +
+  labs(
+    title = "Relationship Between FWI Factors And Burned Area") + 
+  facet_wrap(scales = "free_x",vars(factors)) +
+  theme(axis.ticks = element_blank())
+```
+
+After filtering and looking at the plot again, there doesn’t seem to be any relationship that indicates that any
+of these factors affect the intensity of the fire when we look at it with respect to the area burnt.

@@ -1,0 +1,266 @@
+---
+title: "Creating An Efficient Data Analysis Workflow Part 2"
+author: "Joshua Pasaye"
+date: "2023-05-02"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Guided Project: Creating An Efficient Data Analysis Workflow Part 2
+
+# 1 of 7 · Introduction
+
+## Learn
+
+Throughout this course, we've learned a few powerful tools and packages for data analysis. The map() function from purrr helps us vectorize functions on tibbles, the stringr package has many functions that help us process strings, and lubridate is our go-to for handling dates. Knowing these packages expands our abilities as analysts and programmers.
+
+That being said, it's time for us to apply what we've learned again in a guided project. More tools in our programming toolkit means that we can take on different, perhaps harder, problems. Like in the last guided project, we are taking on the role of an analyst for a book company. The company has provided us more data on some of its 2019 book sales, and it wants us to extract some usable knowledge from it. It launched a new program encouraging customers to buy more books on July 1st, 2019, and it wants to know if this new program was successful at increasing sales and improving review quality. As the analyst, this will be your job to figure out for the guided project.
+
+You can download the dataset here, and if you find that getting stuck, you can consult the suggested solutions to the project here. We highly suggest going as long as you can without looking at the solutions; part of the learning process for learning programming is to recognize when certain functions or concepts are useful in given situations. We recommend looking back at previous lessons to refresh yourself on concepts you've learned.
+
+Like last time, you should work on the project in your own RMarkdown file in RStudio. Now, let's start this guided project!
+
+# 2 of 7 · Data Exploration
+
+## Learn
+
+As with any data analysis project, we should try to frame things in terms of a workflow. This workflow will give us a solid framework to approach any problem that we might encounter. Before we even think about data analysis, we should explore the data itself and make note of any potential problems that we might run into.
+
+In this lesson, we're dealing with review data. This review data was in the form of strings, which required some extra cleaning for us to calculate any meaningful summaries from it. Now that you know more about the stringr package, you have more tools to handle more complicated string data. 
+
+### Instructions
+
+1. How big is the dataset? What are the column names and what do they represent?
+
+2. What are the types of each of the columns?
+
+3. Do any of the columns have missing data? If so, make not of it.
+
+```{r data, echo= TRUE}
+# Load libraries
+library(tidyverse)
+library(lubridate)
+
+# Update working directory
+setwd("C://Users//joshp//OneDrive//Desktop//Data Quest")
+
+# Load data
+book_sales <- read.csv("sales2019.csv")
+
+# Questions 1
+dim(book_sales)
+
+# Question 2
+glimpse(book_sales)
+
+# Question 3
+for(col in colnames(book_sales)) {
+  null_val <- book_sales %>% pull(col) %>% is.na %>% sum()
+  paste(col, ":", null_val) %>% print()
+}
+```
+
+# 3 of 7 · Handling Missing Data
+
+## Learn
+
+We found that there were two columns missing data. The first is the user_submitted_review column, which contains the review left by the customer. The second is total_purchased, which represents how many books were purchased by the customer.
+
+For this guided project, we're going to handle these two columns differently. The reason for this is due to the fact that we care a lot more about the total_purchased column, because it contains the actual information on book sales. We want to determine if the company's new program helped to improve sales. In order to keep as much information on sales as possible, we're going to take a different approach to handling missing data.
+
+In short, we're going to remove any rows that have missing data in user_submitted_review. You've done this in the previous guided project, so your code to get rid of these rows will look similar.
+
+For total_purchased, we're going to use a slightly more sophisticated approach. We are going to replace all of the NA values with an average value that we calculate from the complete dataset. Filling in missing data with average values is useful because they are often the best guesses for what the purchase would have been. We do this in everyday life too. If someone asked you how much time you slept each day, you're more likely than not to answer with the average amount of time you sleep in a week. We're going to apply the same concept here.
+
+### Instructions
+
+1. Remove all rows in the dataset that have an NA value for the user_submitted_review column.
+
+2. Using the remaining rows that have data, calculate the average number of books purchased on an order.
+
+3. Fill all of the missing values in total_purchased with the average value you calculated in step 2.
+
+```{r removing NA values, echo= TRUE}
+# Question 1
+book_sales <- book_sales %>%
+  filter(!is.na(user_submitted_review))
+dim(book_sales)
+# 855 have been removed
+
+# Question 2
+avg_book_purchased <- (book_sales %>% filter(!is.na(total_purchased)) %>%
+  pull(total_purchased) %>% mean() %>% round()
+  )
+
+# Questions 3
+book_sales <- book_sales %>%
+  mutate(
+    total_purchased_notnull = ifelse(is.na(total_purchased), 
+                              avg_book_purchased, total_purchased)
+  )
+
+head(book_sales)
+```
+
+# 4 of 7 · Processing Review Data
+
+## Learn
+
+String data can be incredibly difficult to work with, compared to the ease of handling numeric data. One reason for this is that there are several languages, and multiple words within a single language. Combine this with the fact that we can make errors when writing and get some messy data.
+
+The user_submitted_review column contains reviews in the form of sentences. Ultimately, we want to be able to classify reviews as either positive or negative. This allows us to count the number of negative or positive reviews in the analysis part of the workflow. On this screen, we'll perform the cleaning and processing necessary to turn each of the review sentences into the classifications we want.
+
+### Instructions
+
+1. Examine the unique sentences that are present in in user_submitted_review. 
+
+2. Create a function that takes in a sentence (think: a value from user_submitted_review) and returns a value indicating if the review is positive or not. 
+
+3. Create a new column in the dataset that indicates whether or not the review in a given row is positive or not.
+
+```{r strings, echo = TRUE}
+# Question 1
+unique(book_sales$user_submitted_review)
+
+# Question 2
+is_pos_review <- function(review) {
+  case_when(
+    str_detect(review, "okay") ~ TRUE,
+    str_detect(review, "Awesome") ~ TRUE,
+    str_detect(review, "OK") ~ TRUE,
+    str_detect(review, "learned") ~ TRUE,
+    str_detect(review, "Never read a better book") ~ TRUE,
+    TRUE ~ FALSE
+  )
+}
+
+# Questions 3
+book_sales <- book_sales %>%
+  mutate(
+    positive_review = is_pos_review(user_submitted_review)
+  )
+
+head(book_sales)
+```
+
+# 5 of 7 · Comparing Book Sales Between Pre- and Post-Program Sales
+
+## Learn
+
+With the review data and order quantities processed into a usable form, we can finally make a move towards answering the main question of the analysis, Was the new book program effective in increasing book sales? The program started on July 1, 2019 and the data you have contains all of the sales for 2019. There are still some preparatory steps we need to take before performing the analysis, so we'll complete these first before conducting the analysis.
+
+First, the dates are currently represented in string form. These must be properly formatted before we can make any comparisons based on date and time.
+
+Second, we need a clear way to distinguish between sales that happen before the program starts and those that happen after. We need to distinguish between these two groups so that we can use what we've learned to easily calculate the summary values we want from the data.
+
+Finally, this analysis should be put into a neat form that can be easily read and understood by anyone looking at it. This type of analysis is most efficiently done using a combination of the group_by() function and the summarize() function. If we had some column in the dataset that described what group a row belongs to (i.e. a column named group), we could vectorize summary functions on groups with summarize().
+
+```{r example code, echo=TRUE}
+# A tibble with a group variable in `group`
+example_tibble <- tibble(
+  group = c(1, 1, 1, 1, 2, 2, 2, 2),
+  value = c(1, 2, 3, 4, 5, 6, 7, 8)
+)
+
+# Using group_by() and summarize() to create a summary tibble
+example_summary_table <- example_tibble %>%
+  group_by(group) %>%
+  summarize(
+    sum_of_values = sum(value)
+  )
+
+example_summary_table
+# A tibble: 2 x 2
+```
+
+The instructions for this screen have been set up to reflect these analytic tasks.
+
+### Instructions
+
+1. Perform the proper conversion of the date column, so that it actually represents a date and time. 
+
+2. Create a new grouping column using the mutate() function that will help distinguish between sales that happen before July 1, 2019 and sales that happen after this date.
+
+3. Create a summary table that compares the number of books purchased before July 1, 2019 to after.
+
+```{r date analytics, echo=TRUE}
+# Question 1
+book_sales <- book_sales %>%
+  mutate(
+    date = mdy(date)
+  )
+
+# Question 2
+program_period <- mdy("07/01/2019")
+
+book_sales <- book_sales %>%
+  mutate(
+    program = case_when(
+      date >= program_period ~ "Yes",
+      date < program_period ~ "No"
+    )
+  )
+
+# Question 3
+program_summary <- book_sales %>%
+  group_by(program) %>% summarise(
+    total_purchases = sum(total_purchased_notnull)
+  )
+
+print(program_summary)
+```
+
+The program was not really effective. The total sales before the program was larger than the total sales during the program.
+
+# 6 of 7 · Comparing Book Sales Within Customer Type
+
+## Learn
+
+In data analysis, it's common to have several subgroups that you want to compare. In the last step, we just compared sales that were before and after July 1, 2019. It's possible that individual customers responded better to the program and bought more books in response to the program. Or, it could have been businesses that bought more books. In order to explore this sub-analysis, we also need to divide the sales before and after July 1, 2019 into sales that were for individuals versus businesses. 
+
+### Instructions
+
+1.Perform the same analysis that you did in the last step but add in the customer_type column to further subdivide the groups.
+
+2. Examine the results of the analysis and write about your observations. Does the program still seem to have an effect on increasing sales? Did it have a different effect for individuals versus businesses?
+
+```{r customer type, echo = TRUE}
+# Add customer type column
+program_summary_new <- book_sales %>%
+  group_by(program, customer_type) %>% summarise(
+    total_purchases = sum(total_purchased_notnull)
+  )
+
+print(program_summary_new)
+```
+
+The business customer type seemed to buy more books with the program than the individual, whereas the individual customer type seemed to buy more not in the program.
+
+# 7 of 7 · Comparing Review Sentiment Between Pre- and Post-Program Sales
+
+## Learn
+
+The last question that we need to answer with the data is, did review scores improve as a result of the program? We'll need to use the new column that you created to decide whether a review was positive or negative. This analysis looks like our analysis on purchase quantity. This is not a coincidence! A lot of analysis will require comparing two groups together based on some quantity, whether it is the number of books or positive reviews. The group_by() function in combination with summarize() is an incredibly useful tool for approaching this type of comparison analysis. Most of our hard work is centered on getting the data into a useable form. Examples include transforming sentences into a classification and imputing the missing purchase quantities.
+
+As you learn more programming, you will start to recognize that certain function are good for a particular situation. This recognition comes with lots of practice. whether it's in the form of our guided projects or any projects that you may take on in the future. When you learn new functions or concepts in our Analyst track, take some time to think of a programming situation where the function might be useful. It's not only a fun exercise, it could save you a lot of time when you encounter that situation again. 
+
+## Instructions
+
+1. Create another summary table that compares the number of positive reviews before and after July 1, 2019. 
+
+```{r positive review summary, echo=TRUE}
+# Create positive review summary table
+program_summary_pos <- book_sales %>%
+  group_by(program) %>%
+  summarise(
+    pos_review = sum(positive_review)
+  )
+
+print(program_summary_pos)
+```
+
+It seemed like the positive review got a little worse with the program.

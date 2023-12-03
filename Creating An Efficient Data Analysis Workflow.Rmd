@@ -1,0 +1,308 @@
+---
+title: "Creating An Efficient Data Analysis Workflow"
+author: "Joshua Pasaye"
+output: html_document
+date: "2023-04-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1 of 6 - Getting Familiar With the Data
+
+## Learn
+
+It's easy to lose context when we're just talking about data analysis in general. The first thing we should do before we do any analysis is to get acquainted with our dataset. There are many, many things to check with a dataset before we dive into any analysis. How much data is there? What kind of data do we actually have on hand? Is there anything "weird" that might interfere with any analyses we might need to do? Is there missing data? Answering these questions now saves we time and effort later.
+
+If we don't check the data beforehand, it's easy to make some false assumptions about the data that can hinder our progress later. Maybe we think that one column looks like a number, but it's actually been read in as a string. Perhaps some things were misspelled. In any case, getting familiar with the data is our first step in the data analysis workflow. Here's a few helpful questions to start out any data analysis. Answer each of these questions for the sales dataset.
+
+Since this lesson is a guided project, we are trying to encourage students to use and apply each of the concepts they've learned in this and previous courses. For convenience, we'll lay out some example code that may prove helpful as you are going through the exercises.
+
+Some of the questions can be answered with a for loop. Recall that a for loop looks like the following:
+
+```{r for loop,echo = TRUE}
+input_vector <- c("first", "second", "third")
+for (input in input_vector) {
+  print(input)
+}
+```
+
+Other questions might incorporate control flow with an if statement. An if statement can be written like the following:
+
+```{r if else loop, echo = TRUE}
+condition_met <- TRUE
+if (condition_met) {
+  print("This branch runs because the conditional operator was true")
+  } else {
+    print("This branch runs because the conditional operator was false")
+}
+```
+
+For the most part, you will be using the if_else() function and case_when() function since you'll be dealing with data in tibbles, but it's still good to know the general control flow structure.
+
+One of the instructions also asks about unique values in a column. If we have a vector that has duplicate values in it, we can see all of the unique values in it with the unique() function. We show an example use below:
+
+```{r unqiue function, echo = TRUE}
+vector_with_duplicates <- c(1, 1, 1, 2, 2, 3, 3, 3, 3)
+unique(vector_with_duplicates)
+```
+
+### Instructions
+
+You can use the glimpse() function to answer questions 1 - 3.
+
+1.How big is the dataset?
+
+  -You should take note of how many columns there are and how many rows there are.
+  
+  -Write some notes to yourself to keep track of what we see in the datset.
+    
+2.What are the column names?
+
+  -What do each of the columns seem to represent?
+
+3.What are the types of each of the columns? Sometimes you may find that data will look one way, but is actually disguised as another. As mentioned above, a common example of this is numbers that are actually strings in the data!
+
+4.What are the unique values are present in each of the columns?
+
+  -If we're dealing with numbers, it's good to get a sense of how high and how low the values go. If we're dealing with strings, it's good to see all of the different possible values that are there.
+
+```{r, echo = TRUE}
+# Inputting CSV File
+setwd("C://Users//joshp//OneDrive//Desktop//Data Quest")
+library(tidyverse)
+book_reviews <- read.csv("book_reviews.csv")
+
+# How big is the dataset?
+glimpse(book_reviews)
+
+# What are column names?
+colnames(book_reviews)
+```
+
+# 2 of 6 - Handling Missing Data
+
+## Learn
+
+Now that we are more familiar with the data itself, now we can get into the more specific details of data analysis. A large part of a data analyst's job is to take a raw dataset and turn it into a form that we can use for analysis. Many times, we will not be able to just take a dataset and start analyzing it. It's good practice to examine the data beforehand and make note of any changes we need to make for it. This process has many names, but for future reference, we'll call it data cleaning or data processing.
+
+The first issue we will contend with is the issue of missing data. Missing data is annoying because there's nothing we can really do with it. We can't perform any analysis or calculations with missing data. In R, missing data is typically shown with NA, which stands for "not available". Some other datasets may convey non-existence in a different way, but NA is the most common.
+
+There are two ways that we can deal with missing data: 1) remove any rows or columns that have missing data (typically, rows) or 2) fill in the missing data in an informed, discipline way. This second way is known as imputation, and it's outside of the scope of what we've learned so far. For now, we'll take first approach with this dataset.
+
+Recall from the Working With Tibbles that we can use a combination of the filter() function and the is.na() function to remove rows that have missing data. is.na() will return TRUE or FALSE depending on if a value is NA or not. This makes it an excellent candidate to filter() on.
+
+```{r is.NA() function, echo=TRUE}
+example_dataset <- tibble(
+  x = c(1, 2, 3, 4, 5),
+  y = c(6, 7, 8, NA, 10) # has a missing value
+)
+
+filtered_example <- example_dataset %>%
+  filter(!is.na(y))
+```
+
+### Instructions
+
+1. Examine the data and get an understanding of which columns have data missing.
+
+  -Since we're going to check through each of the columns, a for loop would be useful in this case.
+    
+2. Create a new copy of the dataset that removes all of the rows that have missing data.
+
+  -Here, you should try to apply the filter() and is.na() functions to get to this new dataset without missing values.
+  
+3. Make a note to ourself on the dimensions of the new dataset. How much data was removed by taking out the rows with missing data?
+
+  -There's no explicitly correct answer for this, but do we think that removing that much data will affect the findings of any calculations we end up doing? It's important to keep questions like this in mind as we clean our data.
+
+```{r questions 1-3, echo=TRUE}
+# Finding the column with the missing data
+column_names <- colnames(book_reviews)
+
+for (col in column_names) {
+  null_var <- book_reviews %>% pull(col) %>% is.na() %>% sum()
+  paste("Number of null values in", col, "column :", null_var) %>% print()
+}
+
+# Removing the column with missing data
+clean_book_reviews <- book_reviews %>% filter(!(is.na(review)))
+
+# Dimsensions of the new dataset
+dim(clean_book_reviews)
+```
+
+# 3 of 6 - Dealing With Inconsistent Labels
+
+## Learn
+
+Now that we've removed all of the missing data from the dataset, we have a complete dataset. This is the ideal case that we would like to start any data analysis, so we're working towards a better dataset already.
+
+The next thing that we need to work on is the state column. You may have noticed that the labeling for each state is inconsistent. For example, California is written as both "California" and "CA". Both "California" and "CA" refer to the same place in the United States, so we should try to clean this up. We need to choose one of the ways to refer to the state, and stick to that convention. Making labels/strings more consistent in the data will make things easier to analyze later on, so we'll handle this issue with this screen.
+
+If we're unfamiliar with the shortened postal codes of the states, we can refer to this helpful guide here. It would be helpful to write down the relevant states in our RMarkdown for reference later if we forget, so we don't have to refer back to the site itself. 
+
+### Instructions
+
+1. What are all the states that are present in the dataset?
+
+  -Look back to what we've logged about the state column to see what we have here.
+      
+```{r unique state column, echo=TRUE}
+# Finding the unique states in the state column
+clean_book_reviews %>% pull(state) %>% unique()
+```
+
+2. With this information in mind, choose a convention to stick to:
+
+  -Either use the full name like "California" or the postal code "CA".
+  
+  -Once we decide on the convention, create a column using the mutate function based on the state column that makes the labeling more consistent.
+
+```{r new state column, echo=TRUE}
+# Creating a new state column to choosing a naming convention
+clean_book_reviews <- clean_book_reviews %>% mutate(
+  state_code = case_when(
+    state == "TX" ~ "TX",
+    state == "NY" ~ "NY",
+    state == "New York" ~ "NY",
+    state == "FL" ~ "FL",
+    state == "Texas" ~ "TX",
+    state == "Florida" ~ "FL",
+    state == "CA" ~ "CA",
+    state == "California" ~ "CA"
+  )
+)
+clean_book_reviews <- clean_book_reviews %>% select(-state)
+```
+
+# 4 of 6 - Transforming The Review Data
+
+## Learn
+
+The first things we'll handle in the dataset are the reviews themselves. You may have noticed in our data exploration that the reviews take the form of strings, ranging from "Poor" to "Excellent". Our goal is to evaluate the ratings of each of the textbooks, but there's not much we can do with text versions of the review scores. It would be better if we were to convert the reviews into a numerical form.
+
+### Instructions
+
+1. Using the mutate() function create a new column in the dataset called review_num. It should take the original review column and convert it into a numerical form. The column should be coded as following:
+      
+  -The case_when() function might be useful here since we know how each of the reviews should be reclassified into numbers.
+  
+  -"Poor" should receive a numerical score of 1
+  
+  -"Fair" should receive a numerical score of 2
+  
+  -"Good" should receive a numerical score of 3
+  
+  -"Great" should receive a numerical score of 4
+  
+  -"Excellent" should receive a numerical score of 5
+
+```{r case_when() function, echo=TRUE}
+# Creating a new column for a numberical review
+clean_book_reviews <- clean_book_reviews %>% mutate(
+  review_num = case_when(
+    review == "Poor" ~ 1,
+    review == "Fair" ~ 2,
+    review == "Good" ~ 3,
+    review == "Great" ~ 4,
+    review == "Excellent" ~ 5
+  )
+)
+```
+
+2. It would also be helpful to have another column that helps us decide if a score is "high" or not. 
+    
+  -For the sake of this exercise, let's decide that a score of 4 or higher qualifies as a "high" score.
+  
+  -Create a new column in the dataset called is_high_review that denotes whether or not the review has a high score or not. In other words, it should be TRUE if review_num is 4 or higher, and FALSE otherwise.
+
+```{r high or not, echo=TRUE}
+# Creating a logical column for high reviews
+clean_book_reviews <- clean_book_reviews %>% mutate(
+  is_high_review = if_else(review_num >= 4, TRUE, FALSE)
+)
+```
+
+# 5 of 6 - Analyzing The Data
+
+## Learn
+
+It's important to keep the overall goal in mind as we handle all the little details of the cleaning. We are acting as an analyst trying to figure out which books are the most profitable for the company. The initial data wasn't in a form that was ready for analysis, so we needed to do this cleaning to prepare it. A lot of analysts starting their first jobs believe that the analysis part of their job will be the bulk of their work. To the contrary, a lot of our work will focus on data cleaning itself, while by comparison the data analysis might only take a few lines.
+
+With all of our data cleaning, now we're ready to do some analysis of the data. Our main goal is to figure out what book is the most profitable. How will we judge what the "most profitable" book is though? Our dataset represents customer purchases. One way to define "most profitable" might be to just choose the book that's purchased the most. Another way to define it would be to see how much money each book generates overall. 
+
+### Instructions
+
+1. Choose a metric that we will define "most profitable" book.
+
+  -Whichever way we choose, we should write down a few notes to ourself to justify our decision and make it clear which method we chose
+  
+  -One definition of profitable may use the price column, so we can see how much money a book generated. We may also prefer to count the number of books purchased since it could be interpreted as how popular the book is.
+
+```{r "most profitable book", echo=TRUE}
+# Finding the most profitable book
+revenue_summary <- clean_book_reviews %>% group_by(book) %>% summarise(
+  sales = n(),
+  revenue = sum(price),
+  avg_review = round(mean(review_num), 2),
+  price = revenue / sales,
+  high_review_perc = round((sum(is_high_review) / sales), 2)
+) %>% arrange(-revenue)
+```
+
+2. For each book, calculate the chosen metric that we chose to measure "most profitable" book from the data.
+
+```{r analysis of "most profitable" book, echo=TRUE}
+# Checking each book in general
+revenue_summary_state <- clean_book_reviews %>% group_by(book, state_code) %>% summarise(
+  sales = n(),
+  revenue = sum(price),
+  avg_review = round(mean(review_num), 2),
+  price = revenue / sales,
+  high_review_perc = round((sum(is_high_review) / sales), 2)
+) %>% arrange(-revenue)
+```
+
+3. Investigate the results of our analysis and write out some notes about what books are the most profitable.
+
+It seems that the "Secrets Of R For Advanced Students" book was the most profitable based on revenue. Additionally, the sales of the book matched other books even with a higher price.
+
+# 6 of 6 - Reporting Your Results
+
+## Learn
+
+After performing the cleaning and analysis, we might think that that's the end. Throughout the guided project, we've just advised that we write some notes to ourself about exploring the data, cleaning it and analyzing it. Remember that we are performing this analysis for the benefit of the company that hired us, so they'll most likely be expecting some form of report from us. They're not going to do the analysis themselves, so we'll need to be able to explain everything that we did in our report and our findings.
+
+Writing a report or creating some polished product after the analysis is important because we need to be able to communicate our findings to others. This is especially important when the people reading our analysis are not programmers themselves and will not be able to understand the code that we wrote for it. Take some time to organize our notes into a small report. This report doesn't need to be a long essay! It only need to communicate the answer to our company's question: "What's our most profitable book?" There are several sub-questions that might need to be answered along with this question like, "How do we know it's the most profitable?" or "How did we calculate our measure for profitability"? Your report is just trying to demonstrate that we have an answer and that we gave some thought on how to get to this answer.
+
+Aside from our hypothetical situation, writing a good report can help show future employers that we are able to think both programmatically and communicate well. For any future analysis we might do, say in another Guided Project, having a polished final product that can be easily read will always be looked up favorably. 
+
+### Instructions
+
+1. A good, common way to structure a report is into three parts: Introduction, Findings, Conclusion.
+
+2. Summarize the notes we've made into polished paragraphs for each section. As a guideline, we can try to answer each of the questions below for each section:
+
+  -Introduction: What motivated our analysis? What kind of data do we have? What is the main question we're trying to answer?
+  
+  -Findings: What did we need to do to the data to do our analysis? What things are we calculating to answer our main question?
+  
+  -Conclusion: What is the answer to our main question? Was there anything that we feel limits our analysis? What should the reader do with our findings?
+  
+### Conclusions
+
+We set out to demonstrate a complete and comprehensive data analysis work flow by analyzing book review
+data. We had a well set up approach on how to achieve our goal. We had to explore and get familiar with
+the data, clean the data, before finally analyzing it. Our goal was to find out the most profitable book. Here
+are some valuable insights from the data:
+
+  -Secrets Of R For Advanced Students is the most valuable book, it generated the most revenue and the
+sales matched those of the other books.
+
+  -The reason for the higher revenue is because it was priced higher. In fact, since all of the books had the
+same sales performance, the key factor for driving the revenue generated by each book was the pricing.
+
+  -Even when we look at the book performances in each individual state, it is nearly identical to the
+overall performance

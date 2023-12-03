@@ -1,0 +1,85 @@
+---
+title: "COVID DQ"
+author: "Joshua Pasaye"
+date: "2023-08-19"
+output: html_document
+---
+
+## R Markdown
+
+
+```{r}
+# COVID-19 GUIDED PROBLEM #
+library(dplyr)
+library(readr)
+covid_df <- read.csv("covid19.csv")
+dim(covid_df)
+vector_cols <- colnames(covid_df)
+print(vector_cols)
+is.character(vector_cols)
+head(covid_df)
+glimpse(covid_df)
+```
+
+
+```{r}
+# Glimpse provides data type and snapshot of each column
+library(dplyr)
+covid_df_all_states <- covid_df %>%
+  filter(Province_State == "All States") %>%
+  select(-Province_State)
+glimpse(covid_df_all_states)
+```
+
+```{r}
+# filter allows us to specify the data in the column so only All States data will be kept once we remove the Province state data
+library(dplyr)
+covid_df_all_states <- covid_df %>%
+  filter(Province_State == "All States") %>%
+  select(-Province_State)
+
+covid_df_all_states_daily <- covid_df_all_states %>%
+  select(Date, Country_Region, active, hospitalizedCurr, daily_tested, daily_positive)
+
+covid_df_all_states_daily_sum <- covid_df_all_states_daily %>%
+  group_by(Country_Region) %>%
+  summarise(tested = sum(daily_tested), positive = sum(daily_positive), active = sum(active), hospitalized = sum(hospitalizedCurr)) %>%
+  arrange((-tested))
+
+glimpse(covid_df_all_states_daily_sum)
+
+covid_top_10 <- head(covid_df_all_states_daily_sum, 10)
+
+countries <- covid_top_10$Country_Region
+tested_cases <- covid_top_10$tested
+positive_cases <- covid_top_10$positive
+active_cases <- covid_top_10$active
+hospitalized_cases <- covid_top_10$hospitalized
+names(tested_cases) <- countries
+names(positive_cases) <- countries
+names(active_cases) <- countries
+names(hospitalized_cases) <- countries
+positive_tested <- round(positive_cases/tested_cases, 4)
+positive_tested_top3 <- positive_tested %>% sort() %>% rev() %>% head(3)
+positive_tested_top3 %>% print()
+
+united_kingdom <- c(0.11, 1473672, 166909, 0, 0)
+united_states <- c(0.10, 17282363, 1877179, 0, 0)
+turkey <- c(0.08, 2031192, 163941, 2980960, 0)
+
+covid_mat <- rbind(united_kingdom, united_states, turkey)
+colnames(covid_mat) <- c("Ratio", "tested", "positive", "active", "hospitalized")
+covid_mat
+
+question <- "Which countries have had the highest number of positive cases against the number of tests?"
+answer <- c("Positive tested cases" = positive_tested_top3)
+
+data_structure_list <- list("dataframes" = c(covid_df, covid_df_all_states, covid_df_all_states_daily, covid_df_all_states_daily_sum, covid_top_10), 
+                            "matrices" = c(covid_mat), 
+                            "vectors" = c(active_cases, countries, hospitalized_cases, covid_df_all_states_daily_sum$positive, positive_cases, positive_tested, positive_tested_top3, tested_cases, vector_cols))
+
+covid_analysis_list <- list(question, answer, data_structure_list)
+print(covid_analysis_list[[2]])
+```
+
+# END
