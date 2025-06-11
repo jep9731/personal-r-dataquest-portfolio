@@ -29,7 +29,7 @@ Each folder includes:
 
 Clone the repo and explore individual project folders:
 
-`git clone https://github.com/jep9731/R-DQ-Portfolio.git`
+`git clone https://github.com/jep9731/personal-r-dataquest-portfolio.git`
 
 Then open `.Rmd` files or `.R` scripts using RStudio.
 
